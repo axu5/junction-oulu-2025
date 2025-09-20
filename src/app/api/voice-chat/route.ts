@@ -1,0 +1,173 @@
+import { ELEVENLABS_WS_URL, VOICE_CHAT_TEXT_MODEL } from "@/consts";
+import { ai } from "@/lib/ai";
+import { VOICE_CHAT_SYSTEM_PROMPT } from "@/prompts";
+import { NextRequest, NextResponse } from "next/server";
+import WebSocket from "ws";
+import { ZodError, z } from "zod";
+
+const requestBodySchema = z.object({
+  text: z.string().min(1).max(1024),
+});
+
+export async function POST(req: NextRequest) {
+  const abortSignal = req.signal;
+  let ws: WebSocket | null = null;
+
+  try {
+    const { text } = requestBodySchema.parse(await req.json());
+    const { readable, writable } = new TransformStream();
+    const writer = writable.getWriter();
+
+    ws = new WebSocket(ELEVENLABS_WS_URL);
+
+    abortSignal.addEventListener("abort", () => {
+      try {
+        ws?.close();
+        writer.abort(new Error("Aborted by client"));
+      } catch {}
+    });
+
+    // Promise that resolves when WS is open
+    const wsReady = new Promise<void>((resolve, reject) => {
+      if (!ws) {
+        throw new Error(
+          "This should never happen, ws is not defined"
+        );
+      }
+
+      ws.onopen = () => {
+        // ws
+        //   ?.send
+        // JSON.stringify({
+        //   text: "",
+        //   voice_settings: {},
+        //   xi_api_key: process.env.ELEVENLABS_API_KEY,
+        // })
+        // ();
+        resolve();
+      };
+      ws.onerror = err =>
+        reject(new Error("WebSocket error: " + String(err)));
+      abortSignal.addEventListener("abort", () =>
+        reject(new Error("Aborted before websocket open"))
+      );
+    });
+
+    // Stream audio from ElevenLabs -> client
+    ws.onmessage = event => {
+      try {
+        const msg = JSON.parse(event.data.toString());
+        if (msg.audio) {
+          const audioBinary = Uint8Array.from(atob(msg.audio), c =>
+            c.charCodeAt(0)
+          );
+          writer.write(audioBinary);
+        }
+        if (msg.isFinal) {
+          writer.close();
+          ws?.close();
+        }
+      } catch (err) {
+        writer.abort(err);
+        ws?.close();
+      }
+    };
+
+    ws.onerror = err => {
+      writer.abort(new Error("WS error: " + String(err)));
+      ws?.close();
+    };
+
+    (async () => {
+      try {
+        await wsReady;
+
+        const gptStream = await ai.chat.completions.create(
+          {
+            model: VOICE_CHAT_TEXT_MODEL,
+            messages: [
+              { role: "system", content: VOICE_CHAT_SYSTEM_PROMPT },
+              { role: "user", content: text },
+            ],
+            stream: true,
+          },
+          { signal: abortSignal }
+        );
+
+        let first = true;
+        for await (const part of gptStream) {
+          if (abortSignal.aborted) break;
+          const delta = part.choices?.[0]?.delta?.content;
+          if (delta) {
+            const body: {
+              text: string;
+              try_trigger_generation: boolean;
+              xi_api_key?: string;
+            } = {
+              text: delta,
+              try_trigger_generation: true,
+            };
+            if (first) {
+              body["xi_api_key"] = process.env.ELEVENLABS_API_KEY;
+              first = false;
+            }
+            ws?.send(JSON.stringify(body));
+          }
+        }
+
+        if (!abortSignal.aborted) {
+          ws?.send(
+            JSON.stringify({
+              text: "",
+              try_trigger_generation: false,
+            })
+          );
+        }
+      } catch (err) {
+        writer.abort(err);
+        ws?.close();
+      }
+    })();
+
+    return new Response(readable, {
+      status: 200,
+      headers: {
+        "Content-Type": "audio/wav",
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (e) {
+    console.error(e);
+    if (ws && ws.readyState !== WebSocket.CLOSED) {
+      try {
+        if (!abortSignal.aborted) {
+          ws.send(
+            JSON.stringify({
+              text: "",
+              try_trigger_generation: false,
+            })
+          );
+        }
+        ws.close();
+      } catch {}
+    }
+
+    if (e instanceof ZodError) {
+      return NextResponse.json(
+        { error: "Invalid body" },
+        { status: 400 }
+      );
+    }
+    if (abortSignal.aborted) {
+      return NextResponse.json(
+        { error: "Aborted by client" },
+        { status: 499 }
+      );
+    }
+    console.error(e);
+    return NextResponse.json(
+      { error: "Something went wrong" },
+      { status: 500 }
+    );
+  }
+}
