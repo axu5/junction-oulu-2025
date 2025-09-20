@@ -11,11 +11,13 @@
     "test:phonemize": "node --loader ts-node/esm ./scripts/phonemize.ts"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.89.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.544.0",
     "next": "15.5.3",
     "next-themes": "^0.4.6",
+    "openai": "^5.22.0",
     "phonemizer": "^1.2.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",

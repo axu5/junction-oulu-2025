@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * Props:
@@ -121,11 +121,11 @@ export default function SpeechDetector({
       try {
         source.disconnect();
         analyser.disconnect();
-      } catch (e) {}
+      } catch {}
       // Don't close AudioContext if other audio parts of your app need it.
       try {
         audioCtx.close();
-      } catch (e) {}
+      } catch {}
     };
   }, [
     mediaStream,

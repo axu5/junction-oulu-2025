@@ -1,3 +1,4 @@
+import { decodeWav } from "@/lib/wav";
 import { copyFileSync, mkdirSync, readFileSync } from "fs";
 import path from "path";
 import { phonemize } from "phonemizer";
@@ -32,91 +33,6 @@ function detectSilences(
     startTime: s.start / sampleRate,
     endTime: s.end / sampleRate,
   }));
-}
-
-/**
- * Decode a WAV file (PCM16 or PCM32) from a Buffer to Float32Array.
- */
-function decodeWav(buffer: Buffer): {
-  sampleRate: number;
-  numChannels: number;
-  samples: Float32Array;
-} {
-  // Check RIFF header
-  if (buffer.toString("ascii", 0, 4) !== "RIFF")
-    throw new Error("Not a valid WAV file");
-  if (buffer.toString("ascii", 8, 12) !== "WAVE")
-    throw new Error("Not a WAVE file");
-
-  // Find 'fmt ' chunk
-  let fmtChunkOffset = 12;
-  while (
-    buffer.toString("ascii", fmtChunkOffset, fmtChunkOffset + 4) !==
-    "fmt "
-  ) {
-    fmtChunkOffset += 4;
-    const chunkSize = buffer.readUInt32LE(fmtChunkOffset);
-    fmtChunkOffset += 4 + chunkSize;
-    if (fmtChunkOffset >= buffer.length)
-      throw new Error("fmt chunk not found");
-  }
-
-  const fmtChunkSize = buffer.readUInt32LE(fmtChunkOffset + 4);
-  const audioFormat = buffer.readUInt16LE(fmtChunkOffset + 8); // 1 = PCM
-  const numChannels = buffer.readUInt16LE(fmtChunkOffset + 10);
-  const sampleRate = buffer.readUInt32LE(fmtChunkOffset + 12);
-  const bitsPerSample = buffer.readUInt16LE(fmtChunkOffset + 22);
-
-  if (audioFormat !== 1)
-    throw new Error("Only PCM encoding is supported");
-
-  // Find 'data' chunk
-  let dataChunkOffset = fmtChunkOffset + 8 + fmtChunkSize;
-  while (
-    buffer.toString("ascii", dataChunkOffset, dataChunkOffset + 4) !==
-    "data"
-  ) {
-    dataChunkOffset += 4;
-    const chunkSize = buffer.readUInt32LE(dataChunkOffset);
-    dataChunkOffset += 4 + chunkSize;
-    if (dataChunkOffset >= buffer.length)
-      throw new Error("data chunk not found");
-  }
-
-  const dataSize = buffer.readUInt32LE(dataChunkOffset + 4);
-  const dataStart = dataChunkOffset + 8;
-  const sampleCount = dataSize / (bitsPerSample / 8);
-
-  const frameCount = sampleCount / numChannels;
-
-  const samples = new Float32Array(sampleCount);
-  const bytesPerSample = bitsPerSample >> 3;
-
-  for (let i = 0; i < frameCount; i++) {
-    let sum = 0;
-
-    for (let ch = 0; ch < numChannels; ch++) {
-      const offset =
-        dataStart + (i * numChannels + ch) * bytesPerSample;
-      let sample = 0;
-
-      if (bitsPerSample === 16) {
-        sample = buffer.readInt16LE(offset) / 32768; // normalize to -1..1
-      } else if (bitsPerSample === 32) {
-        sample = buffer.readInt32LE(offset) / 2147483648; // normalize to -1..1
-      } else {
-        throw new Error(
-          "Unsupported bits per sample: " + bitsPerSample
-        );
-      }
-
-      sum += sample;
-    }
-
-    samples[i] = sum / numChannels; // average across channels
-  }
-
-  return { numChannels, sampleRate, samples };
 }
 
 const ipaToViseme: Record<string, string> = {
