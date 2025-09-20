@@ -37,7 +37,13 @@ export default function SpeechDetector({
   const rafRef = useRef<number>(null);
   const lastLoudAtRef = useRef(0);
   const [level, setLevel] = useState(0);
+  const speakingRef = useRef(false);
   const [speaking, setSpeaking] = useState(false);
+
+  function setSpeakingState(val: boolean) {
+    speakingRef.current = val;
+    setSpeaking(val);
+  }
 
   useEffect(() => {
     if (!mediaStream) return;
@@ -85,14 +91,17 @@ export default function SpeechDetector({
       const now = performance.now();
       if (rms >= rmsThreshold) {
         lastLoudAtRef.current = now;
-        if (!speaking) {
-          setSpeaking(true);
+        if (!speakingRef.current) {
+          setSpeakingState(true);
           if (onSpeakingChange) onSpeakingChange(true);
         }
       } else {
         // if we are above threshold recently (within hangover), keep speaking true
-        if (speaking && now - lastLoudAtRef.current > hangoverMs) {
-          setSpeaking(false);
+        if (
+          speakingRef.current &&
+          now - lastLoudAtRef.current > hangoverMs
+        ) {
+          setSpeakingState(false);
           if (onSpeakingChange) onSpeakingChange(false);
         }
       }
@@ -164,6 +173,7 @@ export default function SpeechDetector({
         <div style={{ fontSize: 12, color: "#666" }}>
           Level (RMS): {level.toFixed(4)}
         </div>
+        <div>RMS Threshold: {rmsThreshold}</div>
       </div>
     </div>
   );
