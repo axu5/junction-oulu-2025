@@ -1,11 +1,11 @@
 "use client";
 
+import { VisemeRenderer } from "@/components/viseme-renderer";
 import { useVoiceChat } from "@/hooks/use-voice-chat";
 import {
   assignVisimeTimes,
   mapWordPhonemesToVisemes,
 } from "@/lib/visemes";
-import Image from "next/image";
 import { phonemize } from "phonemizer";
 import { useEffect, useRef, useState } from "react";
 
@@ -66,6 +66,7 @@ export default function VoiceChatTestPage() {
           );
 
           if (visemeFrame) {
+            console.log("Drawing visiemeFrame", visemeFrame);
             setCurrentViseme(visemeFrame.viseme);
           }
         }
@@ -82,7 +83,6 @@ export default function VoiceChatTestPage() {
     return () => {
       if (animationRef.current)
         cancelAnimationFrame(animationRef.current);
-      setCurrentViseme("X");
     };
   }, [loading, getCurrentTimeMs, wordTimingRef]);
 
@@ -119,88 +119,7 @@ export default function VoiceChatTestPage() {
       {error && (
         <div style={{ color: "red", marginTop: 8 }}>{error}</div>
       )}
-      {/* <VisemeRenderer images={images} currentViseme={currentViseme} /> */}
-      {currentViseme === "X" && (
-        <Image
-          loading='eager'
-          src='/visemes/lisa/X.png'
-          alt={""}
-          width={100}
-          height={100}
-        />
-      )}
-      {currentViseme === "A" && (
-        <Image
-          loading='eager'
-          src='/visemes/lisa/A.png'
-          alt={""}
-          width={100}
-          height={100}
-        />
-      )}
-      {currentViseme === "B" && (
-        <Image
-          loading='eager'
-          src='/visemes/lisa/B.png'
-          alt={""}
-          width={100}
-          height={100}
-        />
-      )}
-      {currentViseme === "C" && (
-        <Image
-          loading='eager'
-          src='/visemes/lisa/C.png'
-          alt={""}
-          width={100}
-          height={100}
-        />
-      )}
-      {currentViseme === "D" && (
-        <Image
-          loading='eager'
-          src='/visemes/lisa/D.png'
-          alt={""}
-          width={100}
-          height={100}
-        />
-      )}
-      {currentViseme === "E" && (
-        <Image
-          loading='eager'
-          src='/visemes/lisa/E.png'
-          alt={""}
-          width={100}
-          height={100}
-        />
-      )}
-      {currentViseme === "F" && (
-        <Image
-          loading='eager'
-          src='/visemes/lisa/F.png'
-          alt={""}
-          width={100}
-          height={100}
-        />
-      )}
-      {currentViseme === "G" && (
-        <Image
-          loading='eager'
-          src='/visemes/lisa/G.png'
-          alt={""}
-          width={100}
-          height={100}
-        />
-      )}
-      {currentViseme === "H" && (
-        <Image
-          loading='eager'
-          src='/visemes/lisa/H.png'
-          alt={""}
-          width={100}
-          height={100}
-        />
-      )}
+      <VisemeRenderer currentViseme={currentViseme} />
     </div>
   );
 }

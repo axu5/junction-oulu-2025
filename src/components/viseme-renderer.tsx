@@ -1,28 +1,39 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 
 export function VisemeRenderer({
   currentViseme,
-  images,
   width = 100,
   height = 100,
 }: {
   currentViseme: string | null;
-  images: Record<string, HTMLImageElement>;
   width?: number;
   height?: number;
 }) {
-  console.log(currentViseme);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const visemeImages: Record<string, HTMLImageElement> = {};
-  ["A", "B", "C", "D", "E", "F", "G", "H", "X"].forEach(v => {
-    if (typeof window !== "undefined") {
+  const [images, setImages] = useState<
+    Record<string, HTMLImageElement>
+  >({});
+
+  console.log(images);
+
+  // preload images once
+  useEffect(() => {
+    const keys = ["A", "B", "C", "D", "E", "F", "G", "H", "X"];
+    const loaded: Record<string, HTMLImageElement> = {};
+    let count = 0;
+
+    keys.forEach(v => {
       const img = new Image();
       img.src = `/visemes/lisa/${v}.png`;
-      visemeImages[v] = img;
-    }
-  });
+      img.onload = () => {
+        count++;
+        if (count === keys.length) setImages(loaded);
+      };
+      loaded[v] = img;
+    });
+  }, [setImages]);
 
   useEffect(() => {
     if (!canvasRef.current) return;
