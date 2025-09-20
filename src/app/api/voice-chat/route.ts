@@ -17,8 +17,10 @@ export async function POST(req: NextRequest) {
     const { text } = requestBodySchema.parse(await req.json());
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
+    const wsUrl = new URL(ELEVENLABS_WS_URL);
+    wsUrl.searchParams.set("sync_alignment", "true");
 
-    ws = new WebSocket(ELEVENLABS_WS_URL);
+    ws = new WebSocket(wsUrl);
 
     abortSignal.addEventListener("abort", () => {
       try {
@@ -54,20 +56,30 @@ export async function POST(req: NextRequest) {
     });
 
     // Stream audio from ElevenLabs -> client
-    ws.onmessage = event => {
+    ws.onmessage = async event => {
       try {
         const msg = JSON.parse(event.data.toString());
         if (msg.audio) {
-          const audioBinary = Uint8Array.from(atob(msg.audio), c =>
-            c.charCodeAt(0)
+          const words = charsToWords(
+            msg.normalizedAlignment?.chars ?? [],
+            msg.normalizedAlignment?.charStartTimesMs ?? [],
+            msg.normalizedAlignment?.charDurationsMs ?? []
           );
-          writer.write(audioBinary);
+
+          const payload = {
+            audio: msg.audio,
+            words,
+          };
+
+          const line = JSON.stringify(payload) + "\n";
+          writer.write(new TextEncoder().encode(line));
         }
         if (msg.isFinal) {
           writer.close();
           ws?.close();
         }
       } catch (err) {
+        console.error(err);
         writer.abort(err);
         ws?.close();
       }
@@ -132,7 +144,7 @@ export async function POST(req: NextRequest) {
     return new Response(readable, {
       status: 200,
       headers: {
-        "Content-Type": "audio/wav",
+        "Content-Type": "audio/x-ndjson",
         "Cache-Control": "no-store",
       },
     });
@@ -170,4 +182,40 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function charsToWords(
+  chars: string[],
+  starts: number[],
+  durations: number[]
+) {
+  const words: { text: string; start: number; end: number }[] = [];
+  let currentWord = "";
+  let wordStart: number | null = null;
+  let wordEnd: number | null = null;
+
+  chars.forEach((ch, i) => {
+    if (ch === " ") {
+      if (currentWord && wordStart !== null && wordEnd !== null) {
+        words.push({
+          text: currentWord + " ",
+          start: wordStart,
+          end: wordEnd,
+        });
+      }
+      currentWord = "";
+      wordStart = null;
+      wordEnd = null;
+    } else {
+      if (wordStart === null) wordStart = starts[i];
+      wordEnd = starts[i] + durations[i];
+      currentWord += ch;
+    }
+  });
+
+  if (currentWord && wordStart !== null && wordEnd !== null) {
+    words.push({ text: currentWord, start: wordStart, end: wordEnd });
+  }
+
+  return words;
 }

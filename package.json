@@ -11,7 +11,6 @@
     "test:phonemize": "node --loader ts-node/esm ./scripts/phonemize.ts"
   },
   "dependencies": {
-    "@elevenlabs/elevenlabs-js": "^2.15.0",
     "@tanstack/react-query": "^5.89.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

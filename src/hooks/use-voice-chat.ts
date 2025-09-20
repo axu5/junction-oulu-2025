@@ -2,14 +2,21 @@
 
 import { useRef, useState } from "react";
 
+export type Word = { text: string; start: number; end: number };
+
 export function useVoiceChat() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const audioCtxRef = useRef<AudioContext | null>(null);
+  const playbackStateRef = useRef<{
+    startTime: number;
+    context: AudioContext;
+  }>(null);
+  // const audioCtxRef = useRef<AudioContext | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const playingRef = useRef(false);
   const queueRef = useRef<(() => Promise<void>)[]>([]);
   const processingRef = useRef(false);
+  const wordTimingRef = useRef<Word[][]>([]);
 
   async function processQueue() {
     if (processingRef.current) return;
@@ -33,20 +40,21 @@ export function useVoiceChat() {
     abortRef.current?.abort();
     abortRef.current = new AbortController();
 
-    if (audioCtxRef.current) {
-      audioCtxRef.current.close();
-      audioCtxRef.current = null;
+    if (playbackStateRef.current) {
+      playbackStateRef.current.context.close();
+      playbackStateRef.current = null;
     }
 
     const audioCtx = new AudioContext();
-    audioCtxRef.current = audioCtx;
     playingRef.current = true;
 
     try {
       const res = await fetch("/api/voice-chat", {
         method: "POST",
         body: JSON.stringify({ text }),
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         signal: abortRef.current.signal,
       });
 
@@ -57,17 +65,47 @@ export function useVoiceChat() {
         );
 
       const reader = res.body.getReader();
-      let audioBuffers: AudioBuffer[] = [];
-      let bufferQueue: Uint8Array[] = [];
+      const decoder = new TextDecoder();
+      let buffer = "";
 
-      // Collect all audio chunks
+      // To accumulate audio binary
+      const audioBuffers: AudioBuffer[] = [];
+      const bufferQueue: Uint8Array[] = [];
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        if (value) bufferQueue.push(value);
+
+        buffer += decoder.decode(value, { stream: true });
+
+        // Split on newlines
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? ""; // keep incomplete line for next iteration
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const msg = JSON.parse(line);
+
+            if (msg.audio) {
+              // Decode base64 audio
+              const audioBinary = Uint8Array.from(
+                atob(msg.audio),
+                c => c.charCodeAt(0)
+              );
+              bufferQueue.push(audioBinary);
+            }
+
+            if (msg.words) {
+              wordTimingRef.current.push(msg.words);
+            }
+          } catch (err) {
+            console.error("Bad NDJSON line:", line, err);
+          }
+        }
       }
 
-      // Concatenate all chunks into a single buffer
+      // Once finished, merge audio buffers
       const totalLength = bufferQueue.reduce(
         (sum, arr) => sum + arr.length,
         0
@@ -79,16 +117,12 @@ export function useVoiceChat() {
         offset += arr.length;
       }
 
-      // Decode the full audio buffer
       try {
         const audioBuffer = await audioCtx.decodeAudioData(
-          concat.buffer.slice(
-            concat.byteOffset,
-            concat.byteOffset + concat.byteLength
-          )
+          concat.buffer
         );
         audioBuffers.push(audioBuffer);
-      } catch (err) {
+      } catch {
         setError("Audio decode error");
         setLoading(false);
         playingRef.current = false;
@@ -102,10 +136,10 @@ export function useVoiceChat() {
       }
 
       setLoading(false);
-    } catch (err: any) {
-      if (err.name !== "AbortError") {
-        setError(err.message || "Unknown error");
-      }
+    } catch {
+      // if (err.name !== "AbortError") {
+      //   setError("Unknown error");
+      // }
       setLoading(false);
     } finally {
       playingRef.current = false;
@@ -118,21 +152,47 @@ export function useVoiceChat() {
       const source = audioCtx.createBufferSource();
       source.buffer = buffer;
       source.connect(audioCtx.destination);
-      source.onended = () => resolve();
+      source.onended = () => {
+        if (playbackStateRef.current) {
+          playbackStateRef.current.context.close();
+          playbackStateRef.current = null;
+        }
+        resolve();
+      };
+
+      const startTime = audioCtx.currentTime;
+      playbackStateRef.current = {
+        startTime,
+        context: audioCtx,
+      };
+
       source.start();
     });
   }
 
   function stop() {
     abortRef.current?.abort();
-    if (audioCtxRef.current) {
-      audioCtxRef.current.close();
-      audioCtxRef.current = null;
+    if (playbackStateRef.current) {
+      playbackStateRef.current.context.close();
+      playbackStateRef.current = null;
     }
     playingRef.current = false;
     setLoading(false);
     queueRef.current = [];
   }
 
-  return { speak, stop, loading, error };
+  function getCurrentTimeMs() {
+    const state = playbackStateRef.current;
+    if (!state) return 0;
+    return (state.context.currentTime - state.startTime) * 1000;
+  }
+
+  return {
+    speak,
+    stop,
+    loading,
+    error,
+    getCurrentTimeMs,
+    wordTimingRef,
+  };
 }

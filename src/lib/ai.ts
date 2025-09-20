@@ -1,10 +1,6 @@
-import {
-  ElevenLabs,
-  ElevenLabsClient,
-} from "@elevenlabs/elevenlabs-js";
 import { OpenAI } from "openai";
 
-let errors = [];
+const errors = [];
 
 if (!process.env["OPENAI_API_KEY"]) {
   errors.push("OPENAI_API_KEY missing from .env");
@@ -22,5 +18,3 @@ if (errors.length > 0) {
 }
 
 export const ai = new OpenAI();
-
-export const elevenlabs = new ElevenLabsClient();
