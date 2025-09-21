@@ -70,10 +70,11 @@ export function VisemeRenderer({
       />
       <NextImage
         className='absolute top-1/2 left-1/2 -translate-1/2 z-0'
-        src='/kmarkitty.png'
+        src='/kmarkitty.gif'
         alt='Kmarkitty'
         width={width}
         height={height}
+        unoptimized
       />
     </>
   );

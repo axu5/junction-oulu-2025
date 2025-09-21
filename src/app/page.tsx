@@ -1,7 +1,8 @@
 "use client";
 
-import SpeechDetector from "@/components/speech-detector";
 import { VisemeRenderer } from "@/components/viseme-renderer";
+import { ChatMessage } from "@/hooks/use-llm";
+import { useSpeechDetector } from "@/hooks/use-speech-detector";
 import { useTranscribe } from "@/hooks/use-transribe";
 import { useVoiceChat } from "@/hooks/use-voice-chat";
 import { useVisemeAnimation } from "@/hooks/use-voice-chat-visemes";
@@ -14,12 +15,59 @@ export default function Home() {
   const audioChunksRef = useRef<Blob[]>([]);
   const {
     speak,
-    stop,
+    // stop,
     loading,
     getCurrentTimeMs,
     wordTimingRef,
-    assistantSpeaking,
+    // assistantSpeaking,
   } = useVoiceChat();
+
+  useSpeechDetector({
+    mediaStream: stream,
+    config: {
+      hangoverMs: 2000,
+      rmsThreshold: 0.05,
+    },
+
+    onSpeakingChange: isUserSpeaking => {
+      if (!stream) {
+        // this should never happen
+        return;
+      }
+
+      if (transcribe.isPending) {
+        return;
+      }
+
+      if (isUserSpeaking) {
+        // if (assistantSpeaking) {
+        //   stop();
+        // }
+        if (!mrRef.current) {
+          const mr = new MediaRecorder(stream);
+          audioChunksRef.current = [];
+
+          mr.ondataavailable = e => {
+            if (e.data.size > 0) {
+              audioChunksRef.current.push(e.data);
+            }
+          };
+
+          mr.onstop = async () => {
+            await transcribe.mutateAsync(audioChunksRef.current);
+          };
+
+          mr.start();
+          mrRef.current = mr;
+        }
+      } else {
+        if (mrRef.current) {
+          mrRef.current.stop();
+          mrRef.current = null;
+        }
+      }
+    },
+  });
 
   const currentViseme = useVisemeAnimation(
     wordTimingRef,
@@ -28,10 +76,15 @@ export default function Home() {
   );
   const transcribe = useTranscribe({
     onSuccess({ transcript }) {
-      if (assistantSpeaking) {
-        stop();
-      }
-      speak(transcript);
+      // if (assistantSpeaking) {
+      //   stop();
+      // }
+      const userMsg: ChatMessage = {
+        role: "user",
+        content: transcript,
+      };
+
+      speak([userMsg]);
     },
   });
 
@@ -56,52 +109,7 @@ export default function Home() {
   return (
     <>
       {!stream && <>Requesting microphone access</>}
-      {stream && (
-        <SpeechDetector
-          config={{
-            hangoverMs: 2000,
-            rmsThreshold: 0.05,
-          }}
-          mediaStream={stream}
-          onSpeakingChange={isUserSpeaking => {
-            if (transcribe.isPending) {
-              return;
-            }
-
-            if (isUserSpeaking) {
-              if (assistantSpeaking) {
-                stop();
-              }
-              if (!mrRef.current) {
-                const mr = new MediaRecorder(stream);
-                audioChunksRef.current = [];
-
-                mr.ondataavailable = e => {
-                  if (e.data.size > 0) {
-                    audioChunksRef.current.push(e.data);
-                  }
-                };
-
-                mr.onstop = async () => {
-                  await transcribe.mutateAsync(
-                    audioChunksRef.current
-                  );
-                };
-
-                mr.start();
-                mrRef.current = mr;
-              }
-            } else {
-              if (mrRef.current) {
-                mrRef.current.stop();
-                mrRef.current = null;
-              }
-            }
-          }}
-        />
-      )}
-      {/* {transcribe.isSuccess && transcribe.data.transcript} */}
-      <div className='w-screen h-screen'>
+      <div className='w-screen h-screen relative'>
         <VisemeRenderer
           currentViseme={currentViseme}
           width={357}

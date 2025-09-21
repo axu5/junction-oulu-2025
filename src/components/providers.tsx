@@ -1,5 +1,6 @@
 "use client";
 
+import { LLMProvider } from "@/hooks/use-llm";
 import {
   QueryClient,
   QueryClientProvider,
@@ -11,7 +12,7 @@ export const queryClient = new QueryClient();
 export function Providers({ children }: PropsWithChildren) {
   return (
     <QueryClientProvider client={queryClient}>
-      {children}
+      <LLMProvider>{children}</LLMProvider>
     </QueryClientProvider>
   );
 }

@@ -1,10 +1,12 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { ChatMessage, useLLM } from "./use-llm";
 
 export type Word = { text: string; start: number; end: number };
 
 export function useVoiceChat() {
+  const { addMessage, chatHistory } = useLLM();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const playbackStateRef = useRef<{
@@ -28,12 +30,12 @@ export function useVoiceChat() {
     processingRef.current = false;
   }
 
-  async function speak(text: string) {
-    queueRef.current.push(() => speakJob(text));
+  async function speak(messages: ChatMessage[]) {
+    queueRef.current.push(() => speakJob(messages));
     processQueue();
   }
 
-  async function speakJob(text: string) {
+  async function speakJob(messages: ChatMessage[]) {
     setError(null);
     setLoading(true);
 
@@ -49,9 +51,13 @@ export function useVoiceChat() {
     playingRef.current = true;
 
     try {
+      messages.forEach(addMessage);
+
       const res = await fetch("/api/voice-chat", {
         method: "POST",
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({
+          history: [...chatHistory, ...messages],
+        }),
         headers: {
           "Content-Type": "application/json",
         },
@@ -72,6 +78,7 @@ export function useVoiceChat() {
       const audioBuffers: AudioBuffer[] = [];
       const bufferQueue: Uint8Array[] = [];
 
+      let assistantTranscript = "";
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -98,6 +105,11 @@ export function useVoiceChat() {
 
             if (msg.words) {
               wordTimingRef.current.push(msg.words);
+              const sentence = msg.words
+                .map((w: Word) => w.text)
+                .join(" ");
+              assistantTranscript +=
+                (assistantTranscript ? " " : "") + sentence;
             }
           } catch (err) {
             console.error("Bad NDJSON line:", line, err);
@@ -115,6 +127,13 @@ export function useVoiceChat() {
       for (const arr of bufferQueue) {
         concat.set(arr, offset);
         offset += arr.length;
+      }
+
+      if (assistantTranscript) {
+        addMessage({
+          role: "assistant",
+          content: assistantTranscript,
+        });
       }
 
       try {

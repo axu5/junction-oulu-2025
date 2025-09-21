@@ -31,8 +31,6 @@ export async function POST(req: NextRequest) {
       model: "gpt-4o-mini-transcribe",
     });
 
-    console.log(transcription);
-
     return NextResponse.json({ transcript: transcription.text });
   } catch (err) {
     console.error(err);

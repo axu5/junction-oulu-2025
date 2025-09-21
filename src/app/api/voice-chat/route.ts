@@ -6,7 +6,13 @@ import WebSocket from "ws";
 import { ZodError, z } from "zod";
 
 const requestBodySchema = z.object({
-  text: z.string().min(1).max(1024),
+  // text: z.string().min(1).max(1024),
+  history: z.array(
+    z.object({
+      role: z.literal(["assistant", "user"]),
+      content: z.string().min(1).max(1024),
+    })
+  ),
 });
 
 export async function POST(req: NextRequest) {
@@ -14,7 +20,7 @@ export async function POST(req: NextRequest) {
   let ws: WebSocket | null = null;
 
   try {
-    const { text } = requestBodySchema.parse(await req.json());
+    const { history } = requestBodySchema.parse(await req.json());
 
     // const t1 = performance.now();
     // const embedding = await getEmbedding(text);
@@ -150,7 +156,8 @@ export async function POST(req: NextRequest) {
             model: VOICE_CHAT_TEXT_MODEL,
             messages: [
               { role: "system", content: VOICE_CHAT_SYSTEM_PROMPT },
-              { role: "user", content: text },
+              // { role: "user", content: text },
+              ...history,
             ],
             stream: true,
           },
