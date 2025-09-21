@@ -16,8 +16,6 @@ export function VisemeRenderer({
     Record<string, HTMLImageElement>
   >({});
 
-  console.log(images);
-
   // preload images once
   useEffect(() => {
     const keys = ["A", "B", "C", "D", "E", "F", "G", "H", "X"];

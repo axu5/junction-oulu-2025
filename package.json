@@ -8,12 +8,17 @@
     "build": "next build --turbopack",
     "start": "next start",
     "lint": "eslint",
+    "db:push": "drizzle-kit push",
     "test:phonemize": "node --loader ts-node/esm ./scripts/phonemize.ts"
   },
   "dependencies": {
+    "@libsql/client": "^0.15.15",
     "@tanstack/react-query": "^5.89.0",
+    "@vercel/blob": "^2.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dotenv": "^17.2.2",
+    "drizzle-orm": "^0.44.5",
     "lucide-react": "^0.544.0",
     "next": "15.5.3",
     "next-themes": "^0.4.6",
@@ -33,10 +38,12 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/ws": "^8.18.1",
+    "drizzle-kit": "^0.31.4",
     "eslint": "^9",
     "eslint-config-next": "15.5.3",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
+    "tsx": "^4.20.5",
     "tw-animate-css": "^1.3.8",
     "typescript": "^5"
   }

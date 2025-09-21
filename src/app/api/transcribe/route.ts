@@ -4,7 +4,6 @@ import { parseWavHeader } from "@/lib/wav";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(req: NextRequest) {
-  console.log("TRANSRIBING...");
   try {
     const audioBuffer = await req.arrayBuffer();
     const { sampleRate, numChannels, bitsPerSample } =

@@ -1,6 +1,15 @@
-import { ELEVENLABS_WS_URL, VOICE_CHAT_TEXT_MODEL } from "@/consts";
+import {
+  ELEVENLABS_WS_URL,
+  QUERY_CACHE_MODEL,
+  QUERY_CACHE_SIMILARITY_THRESHOLD,
+  QUERY_CACHE_VERSION,
+  VOICE_CHAT_TEXT_MODEL,
+} from "@/consts";
+import { db } from "@/db";
+import { queryCache } from "@/db/schema";
 import { ai } from "@/lib/ai";
 import { VOICE_CHAT_SYSTEM_PROMPT } from "@/prompts";
+import { InferSelectModel, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import WebSocket from "ws";
 import { ZodError, z } from "zod";
@@ -15,6 +24,53 @@ export async function POST(req: NextRequest) {
 
   try {
     const { text } = requestBodySchema.parse(await req.json());
+
+    const embeddingResponse = await ai.embeddings.create({
+      input: text.trim(),
+      model: QUERY_CACHE_MODEL,
+    });
+
+    const embedding: number[] = embeddingResponse.data[0].embedding;
+    const embeddingLiteral = embedding.join(",");
+    const { rows } = (await db.run(
+      sql`
+        SELECT
+          qc.*,
+          1 - vector_distance_cos(qc.embedding, vector('[${sql.raw(
+            embeddingLiteral
+          )}]')) AS similarity
+        FROM vector_top_k(
+          'query_cache_embedding_idx',
+          vector('[${sql.raw(embeddingLiteral)}]'),
+          5
+        ) v
+        JOIN query_cache qc ON qc.id = v.id
+        WHERE qc.version = ${QUERY_CACHE_VERSION}`
+    )) as unknown as {
+      rows: (InferSelectModel<typeof queryCache> & {
+        similarity: number;
+      })[];
+    };
+
+    const cached = rows.find(
+      r => r.similarity >= QUERY_CACHE_SIMILARITY_THRESHOLD
+    );
+
+    if (cached) {
+      if (cached.output) {
+        // Return cached NDJSON stream directly
+        return new Response(new Uint8Array(cached.output).buffer, {
+          status: 200,
+          headers: {
+            "Content-Type": "audio/x-ndjson",
+            "Cache-Control": "no-store",
+            "X-Cache": "HIT",
+          },
+        });
+      }
+    }
+
+    const cacheBuffers: Uint8Array[] = [];
     const { readable, writable } = new TransformStream();
     const writer = writable.getWriter();
     const wsUrl = new URL(ELEVENLABS_WS_URL);
@@ -73,10 +129,20 @@ export async function POST(req: NextRequest) {
 
           const line = JSON.stringify(payload) + "\n";
           writer.write(new TextEncoder().encode(line));
+          cacheBuffers.push(new TextEncoder().encode(line));
         }
         if (msg.isFinal) {
           writer.close();
           ws?.close();
+
+          const outputBlob = Buffer.concat(
+            cacheBuffers.map(b => Buffer.from(b))
+          );
+          await db.insert(queryCache).values({
+            embedding: embedding,
+            output: outputBlob,
+            version: QUERY_CACHE_VERSION,
+          });
         }
       } catch (err) {
         console.error(err);
@@ -146,6 +212,7 @@ export async function POST(req: NextRequest) {
       headers: {
         "Content-Type": "audio/x-ndjson",
         "Cache-Control": "no-store",
+        "X-Cache": "MISS",
       },
     });
   } catch (e) {

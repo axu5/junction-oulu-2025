@@ -9,12 +9,7 @@ export default function Home() {
   const [stream, setStream] = useState<MediaStream>();
   const mrRef = useRef<MediaRecorder>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const transcribe = useTranscribe({
-    onSuccess() {
-      audioChunksRef.current = [];
-    },
-  });
-  // const [trancript, setTranscript] = useState("");
+  const transcribe = useTranscribe({});
 
   useEffect(() => {
     async function init() {
