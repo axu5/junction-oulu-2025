@@ -1,6 +1,6 @@
 # Installation
 
-**Environment variables**
+**Environment variables** can be set in a `.env` file.
 
 ```.env
 OPENAI_API_KEY=
@@ -8,6 +8,10 @@ ELEVENLABS_API_KEY=
 TURSO_AUTH_TOKEN=
 TURSO_DATABASE_URL=
 ```
+
+- Get OpenAI API key from [here](https://platform.openai.com/).
+- Elevenlabs API key from [here](https://elevnlabs.io)
+- Turso API keys from [here](https://app.turso.tech/login)
 
 **Local development**
 
