@@ -8,6 +8,7 @@ import { useVoiceChat } from "@/hooks/use-voice-chat";
 import { useVisemeAnimation } from "@/hooks/use-voice-chat-visemes";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import Image from "next/image";
 
 export default function Home() {
   const [stream, setStream] = useState<MediaStream>();
@@ -16,10 +17,9 @@ export default function Home() {
   const {
     speak,
     // stop,
-    loading,
+    loading: thinking,
     getCurrentTimeMs,
     wordTimingRef,
-    // assistantSpeaking,
   } = useVoiceChat();
 
   useSpeechDetector({
@@ -72,7 +72,7 @@ export default function Home() {
   const currentViseme = useVisemeAnimation(
     wordTimingRef,
     getCurrentTimeMs,
-    loading
+    thinking
   );
   const transcribe = useTranscribe({
     onSuccess({ transcript }) {
@@ -110,6 +110,15 @@ export default function Home() {
     <>
       {!stream && <>Requesting microphone access</>}
       <div className='w-screen h-screen relative'>
+        {transcribe.isPending && (
+          <Image
+            className='absolute top-1/2 left-1/2 -translate-1/2 z-20'
+            src='/thought-bubble.gif'
+            width={357}
+            height={600}
+            alt='Thinking'
+          />
+        )}
         <VisemeRenderer
           currentViseme={currentViseme}
           width={357}

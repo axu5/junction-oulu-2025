@@ -34,3 +34,4 @@ pnpm i && pnpm dev
 - Testing + Supporting more languages
 - Localized cultural queues + understanding
 - Webcam for Sign-Language interpretation
+- RAG with product locations/availability for stores

@@ -13,6 +13,7 @@ export function useVoiceChat() {
     startTime: number;
     context: AudioContext;
   }>(null);
+  const [assistantSpeaking, setAssistantSpeaking] = useState(false);
   // const audioCtxRef = useRef<AudioContext | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const playingRef = useRef(false);
@@ -23,11 +24,13 @@ export function useVoiceChat() {
   async function processQueue() {
     if (processingRef.current) return;
     processingRef.current = true;
+    setAssistantSpeaking(true);
     while (queueRef.current.length > 0) {
       const job = queueRef.current.shift();
       if (job) await job();
     }
     processingRef.current = false;
+    setAssistantSpeaking(false);
   }
 
   async function speak(messages: ChatMessage[]) {
@@ -213,6 +216,6 @@ export function useVoiceChat() {
     error,
     getCurrentTimeMs,
     wordTimingRef,
-    assistantSpeaking: processingRef.current,
+    assistantSpeaking,
   };
 }
