@@ -21,6 +21,7 @@ export default function Home() {
     getCurrentTimeMs,
     wordTimingRef,
   } = useVoiceChat();
+  const [firstRender, setFirstRender] = useState(true);
 
   useSpeechDetector({
     mediaStream: stream,
@@ -106,25 +107,57 @@ export default function Home() {
     init();
   }, []);
 
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setFirstRender(false);
+    }, 1050);
+
+    return () => {
+      clearTimeout(t);
+    };
+  }, []);
+
   return (
     <>
       {!stream && <>Requesting microphone access</>}
-      <div className='w-screen h-screen relative'>
-        {transcribe.isPending && (
-          <Image
-            className='absolute top-1/2 left-1/2 -translate-1/2 z-20'
-            src='/thought-bubble.gif'
-            width={357}
-            height={600}
-            alt='Thinking'
-          />
-        )}
-        <VisemeRenderer
-          currentViseme={currentViseme}
+      {firstRender ? (
+        <Image
+          className='absolute top-1/2 left-1/2 -translate-1/2 z-20'
+          src='/wave.gif'
           width={357}
           height={600}
+          alt='Thinking'
         />
-      </div>
+      ) : (
+        <div className='w-screen h-screen relative'>
+          {transcribe.isPending && (
+            <Image
+              className='absolute top-1/2 left-1/2 -translate-1/2 z-20'
+              src='/thought-bubble.gif'
+              width={357}
+              height={600}
+              alt='Thinking'
+            />
+          )}
+          <VisemeRenderer
+            currentViseme={currentViseme}
+            width={357}
+            height={600}
+          />
+        </div>
+      )}
+
+      <video
+        className='absolute top-1/2 left-1/2 -translate-1/2 -z-10'
+        width={357}
+        height={600}
+        autoPlay
+        muted
+        loop
+        playsInline>
+        <source src='/background_animated.mp4' type='video/mp4' />
+        Your browser does not support the video tag.
+      </video>
     </>
   );
 }
