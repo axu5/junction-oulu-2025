@@ -1,7 +1,10 @@
 "use client";
 
 import SpeechDetector from "@/components/speech-detector";
+import { VisemeRenderer } from "@/components/viseme-renderer";
 import { useTranscribe } from "@/hooks/use-transribe";
+import { useVoiceChat } from "@/hooks/use-voice-chat";
+import { useVisemeAnimation } from "@/hooks/use-voice-chat-visemes";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -9,7 +12,28 @@ export default function Home() {
   const [stream, setStream] = useState<MediaStream>();
   const mrRef = useRef<MediaRecorder>(null);
   const audioChunksRef = useRef<Blob[]>([]);
-  const transcribe = useTranscribe({});
+  const {
+    speak,
+    stop,
+    loading,
+    getCurrentTimeMs,
+    wordTimingRef,
+    assistantSpeaking,
+  } = useVoiceChat();
+
+  const currentViseme = useVisemeAnimation(
+    wordTimingRef,
+    getCurrentTimeMs,
+    loading
+  );
+  const transcribe = useTranscribe({
+    onSuccess({ transcript }) {
+      if (assistantSpeaking) {
+        stop();
+      }
+      speak(transcript);
+    },
+  });
 
   useEffect(() => {
     async function init() {
@@ -39,13 +63,15 @@ export default function Home() {
             rmsThreshold: 0.05,
           }}
           mediaStream={stream}
-          onSpeakingChange={isSpeaking => {
+          onSpeakingChange={isUserSpeaking => {
             if (transcribe.isPending) {
-              toast.error("Transcription pending");
               return;
             }
 
-            if (isSpeaking) {
+            if (isUserSpeaking) {
+              if (assistantSpeaking) {
+                stop();
+              }
               if (!mrRef.current) {
                 const mr = new MediaRecorder(stream);
                 audioChunksRef.current = [];
@@ -74,7 +100,14 @@ export default function Home() {
           }}
         />
       )}
-      {transcribe.isSuccess && transcribe.data.transcript}
+      {/* {transcribe.isSuccess && transcribe.data.transcript} */}
+      <div className='w-screen h-screen'>
+        <VisemeRenderer
+          currentViseme={currentViseme}
+          width={357}
+          height={600}
+        />
+      </div>
     </>
   );
 }

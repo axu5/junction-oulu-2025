@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useEffect, useState } from "react";
+import NextImage from "next/image";
 
 export function VisemeRenderer({
   currentViseme,
@@ -24,7 +25,7 @@ export function VisemeRenderer({
 
     keys.forEach(v => {
       const img = new Image();
-      img.src = `/visemes/lisa/${v}.png`;
+      img.src = `/visemes/kmarkitty/${v}.png`;
       img.onload = () => {
         count++;
         if (count === keys.length) setImages(loaded);
@@ -59,5 +60,21 @@ export function VisemeRenderer({
     return () => cancelAnimationFrame(animationFrameId);
   }, [currentViseme, width, height, images]);
 
-  return <canvas ref={canvasRef} width={width} height={height} />;
+  return (
+    <>
+      <canvas
+        className='absolute top-1/2 left-1/2 -translate-1/2 z-10'
+        ref={canvasRef}
+        width={width}
+        height={height}
+      />
+      <NextImage
+        className='absolute top-1/2 left-1/2 -translate-1/2 z-0'
+        src='/kmarkitty.png'
+        alt='Kmarkitty'
+        width={width}
+        height={height}
+      />
+    </>
+  );
 }

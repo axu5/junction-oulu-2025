@@ -194,5 +194,6 @@ export function useVoiceChat() {
     error,
     getCurrentTimeMs,
     wordTimingRef,
+    assistantSpeaking: processingRef.current,
   };
 }
