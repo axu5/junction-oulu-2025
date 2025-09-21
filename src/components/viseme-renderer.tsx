@@ -76,6 +76,17 @@ export function VisemeRenderer({
         height={height}
         unoptimized
       />
+      <video
+        className='absolute top-1/2 left-1/2 -translate-1/2 -z-10'
+        width={width}
+        height={height}
+        autoPlay
+        muted
+        loop
+        playsInline>
+        <source src='/background_animated.mp4' type='video/mp4' />
+        Your browser does not support the video tag.
+      </video>
     </>
   );
 }
